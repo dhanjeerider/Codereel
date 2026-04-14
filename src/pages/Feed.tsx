@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, increment, getDoc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Heart, MessageCircle, Share2, Bookmark, Maximize2, Code2, X, Copy, ArrowUp, ArrowDown, Send } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Bookmark, Maximize2, Code2, X, Copy, ArrowUp, ArrowDown, Send, Twitter, Facebook } from 'lucide-react';
 
 export default function Feed({ user }: { user: any }) {
   const [reels, setReels] = useState<any[]>([]);
@@ -74,6 +74,7 @@ function ReelItem({ reel, user }: { reel: any, user: any, key?: any }) {
   const [commentCount, setCommentCount] = useState(reel.comments || 0);
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
+  const [showShareModal, setShowShareModal] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
@@ -249,6 +250,37 @@ function ReelItem({ reel, user }: { reel: any, user: any, key?: any }) {
         </div>
       )}
 
+      {showShareModal && (
+        <div className="absolute inset-x-0 bottom-10 top-1/3 bg-panel/95 backdrop-blur-xl rounded-t-3xl z-50 flex flex-col p-6 transition-all duration-300 border-t border-border shadow-2xl">
+          <div className="flex justify-between items-center mb-6 pb-4 border-b border-border">
+            <h3 className="font-bold text-lg flex items-center gap-2 text-foreground">
+              <Share2 size={18} className="text-accent" /> Share Reel
+            </h3>
+            <button onClick={() => setShowShareModal(false)} className="w-8 h-8 rounded-full bg-surface flex items-center justify-center text-muted hover:text-foreground hover:bg-border/50 transition">
+              <X size={18} />
+            </button>
+          </div>
+          <div className="flex flex-col gap-3 overflow-y-auto no-scrollbar pb-4">
+            <button onClick={() => { navigator.clipboard.writeText(window.location.origin + '/?reel=' + reel.id); alert('Link copied!'); setShowShareModal(false); }} className="flex items-center gap-4 p-4 rounded-2xl bg-surface hover:bg-border/50 transition border border-border/50 shadow-sm">
+              <div className="w-12 h-12 rounded-full bg-panel flex items-center justify-center shadow-sm text-foreground"><Copy size={20} /></div>
+              <span className="font-bold text-foreground">Copy Direct Link</span>
+            </button>
+            <a href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(window.location.origin + '/?reel=' + reel.id)}&text=${encodeURIComponent('Check out this awesome code reel by @' + reel.username + ' on CodeReel!')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 p-4 rounded-2xl bg-surface hover:bg-border/50 transition border border-border/50 shadow-sm">
+              <div className="w-12 h-12 rounded-full bg-[#1DA1F2]/10 text-[#1DA1F2] flex items-center justify-center shadow-sm"><Twitter size={20} /></div>
+              <span className="font-bold text-foreground">Share on Twitter</span>
+            </a>
+            <a href={`https://api.whatsapp.com/send?text=${encodeURIComponent('Check out this awesome code reel by @' + reel.username + ' on CodeReel! ' + window.location.origin + '/?reel=' + reel.id)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 p-4 rounded-2xl bg-surface hover:bg-border/50 transition border border-border/50 shadow-sm">
+              <div className="w-12 h-12 rounded-full bg-[#25D366]/10 text-[#25D366] flex items-center justify-center shadow-sm"><MessageCircle size={20} /></div>
+              <span className="font-bold text-foreground">Share on WhatsApp</span>
+            </a>
+            <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.origin + '/?reel=' + reel.id)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 p-4 rounded-2xl bg-surface hover:bg-border/50 transition border border-border/50 shadow-sm">
+              <div className="w-12 h-12 rounded-full bg-[#1877F2]/10 text-[#1877F2] flex items-center justify-center shadow-sm"><Facebook size={20} /></div>
+              <span className="font-bold text-foreground">Share on Facebook</span>
+            </a>
+          </div>
+        </div>
+      )}
+
       <div className="absolute bottom-24 md:bottom-14 left-6 right-20 z-20 pointer-events-none">
         <div className="flex items-center gap-3 mb-3 pointer-events-auto cursor-pointer w-fit" onClick={() => window.location.href = `/profile/${reel.userId}`}>
           <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center font-bold text-lg overflow-hidden flex-shrink-0 text-foreground border-2 border-white shadow-lg">
@@ -281,10 +313,7 @@ function ReelItem({ reel, user }: { reel: any, user: any, key?: any }) {
           </div>
           <span className="text-xs font-bold">{commentCount}</span>
         </button>
-        <button onClick={() => {
-          navigator.clipboard.writeText(window.location.origin + '/?reel=' + reel.id);
-          alert('Link copied!');
-        }} className="flex flex-col items-center gap-1 text-white drop-shadow-md hover:scale-110 transition group">
+        <button onClick={() => setShowShareModal(true)} className="flex flex-col items-center gap-1 text-white drop-shadow-md hover:scale-110 transition group">
           <div className="p-3 rounded-full bg-black/40 backdrop-blur-md shadow-lg group-hover:bg-black/60 border border-white/10 transition-colors">
             <Share2 size={24} />
           </div>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { doc, getDoc, collection, query, where, getDocs, setDoc, deleteDoc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, Edit, Share2, Video, UserPlus, UserMinus } from 'lucide-react';
+import { CheckCircle, Edit, Share2, Video, UserPlus, UserMinus, Twitter, Facebook, MessageCircle, Copy, X } from 'lucide-react';
 
 export default function Profile({ user }: { user: any }) {
   const { id } = useParams();
@@ -13,6 +13,7 @@ export default function Profile({ user }: { user: any }) {
   const [isOwnProfile, setIsOwnProfile] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -150,7 +151,7 @@ export default function Profile({ user }: { user: any }) {
               {isFollowing ? <><UserMinus size={16} /> Unfollow</> : <><UserPlus size={16} /> Follow</>}
             </button>
           )}
-          <button className="px-5 py-2.5 rounded-xl bg-surface border border-border text-foreground text-sm font-medium hover:bg-border/50 transition flex items-center gap-2 shadow-sm">
+          <button onClick={() => setShowShareModal(true)} className="px-5 py-2.5 rounded-xl bg-surface border border-border text-foreground text-sm font-medium hover:bg-border/50 transition flex items-center gap-2 shadow-sm">
             <Share2 size={16} /> Share
           </button>
         </div>
@@ -189,6 +190,39 @@ export default function Profile({ user }: { user: any }) {
           </div>
         )}
       </div>
+
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-panel w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-border">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-bold text-lg flex items-center gap-2 text-foreground">
+                <Share2 size={18} className="text-accent" /> Share Profile
+              </h3>
+              <button onClick={() => setShowShareModal(false)} className="w-8 h-8 rounded-full bg-surface flex items-center justify-center text-muted hover:text-foreground hover:bg-border/50 transition">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex flex-col gap-3">
+              <button onClick={() => { navigator.clipboard.writeText(window.location.origin + '/profile/' + profileUser.id); alert('Link copied!'); setShowShareModal(false); }} className="flex items-center gap-4 p-3 rounded-xl bg-surface hover:bg-border/50 transition border border-border/50 shadow-sm">
+                <div className="w-10 h-10 rounded-full bg-panel flex items-center justify-center shadow-sm text-foreground"><Copy size={18} /></div>
+                <span className="font-bold text-foreground">Copy Direct Link</span>
+              </button>
+              <a href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(window.location.origin + '/profile/' + profileUser.id)}&text=${encodeURIComponent('Check out @' + profileUser.username + '\'s profile on CodeReel!')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 p-3 rounded-xl bg-surface hover:bg-border/50 transition border border-border/50 shadow-sm">
+                <div className="w-10 h-10 rounded-full bg-[#1DA1F2]/10 text-[#1DA1F2] flex items-center justify-center shadow-sm"><Twitter size={18} /></div>
+                <span className="font-bold text-foreground">Share on Twitter</span>
+              </a>
+              <a href={`https://api.whatsapp.com/send?text=${encodeURIComponent('Check out @' + profileUser.username + '\'s profile on CodeReel! ' + window.location.origin + '/profile/' + profileUser.id)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 p-3 rounded-xl bg-surface hover:bg-border/50 transition border border-border/50 shadow-sm">
+                <div className="w-10 h-10 rounded-full bg-[#25D366]/10 text-[#25D366] flex items-center justify-center shadow-sm"><MessageCircle size={18} /></div>
+                <span className="font-bold text-foreground">Share on WhatsApp</span>
+              </a>
+              <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.origin + '/profile/' + profileUser.id)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 p-3 rounded-xl bg-surface hover:bg-border/50 transition border border-border/50 shadow-sm">
+                <div className="w-10 h-10 rounded-full bg-[#1877F2]/10 text-[#1877F2] flex items-center justify-center shadow-sm"><Facebook size={18} /></div>
+                <span className="font-bold text-foreground">Share on Facebook</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
