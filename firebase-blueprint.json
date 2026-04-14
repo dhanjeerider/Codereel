@@ -1,0 +1,122 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile data",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "bio": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "followers": { "type": "number" },
+        "following": { "type": "number" },
+        "reels": { "type": "number" },
+        "likes": { "type": "number" },
+        "isAdmin": { "type": "boolean" },
+        "isVerified": { "type": "boolean" },
+        "privateProfile": { "type": "boolean" },
+        "showEmail": { "type": "boolean" },
+        "notif_comments": { "type": "boolean" },
+        "notif_likes": { "type": "boolean" },
+        "notif_followers": { "type": "boolean" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["name", "username", "email", "createdAt"]
+    },
+    "Username": {
+      "title": "Username",
+      "description": "Username to UID mapping",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["uid", "createdAt"]
+    },
+    "Reel": {
+      "title": "Reel",
+      "description": "Code reel post",
+      "type": "object",
+      "properties": {
+        "html": { "type": "string" },
+        "css": { "type": "string" },
+        "js": { "type": "string" },
+        "caption": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "likes": { "type": "number" },
+        "comments": { "type": "number" },
+        "timestamp": { "type": "number" },
+        "isVerified": { "type": "boolean" }
+      },
+      "required": ["userId", "username", "timestamp"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Comment on a reel",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "username": { "type": "string" },
+        "userId": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "reelId": { "type": "string" }
+      },
+      "required": ["text", "username", "userId", "timestamp", "reelId"]
+    },
+    "Ad": {
+      "title": "Ad",
+      "description": "Advertisement",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "image": { "type": "string" },
+        "link": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["title", "image", "link", "timestamp", "active"]
+    },
+    "Like": {
+      "title": "Like",
+      "description": "Like record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "reelId": { "type": "string" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["userId", "reelId", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "/usernames/{username}": {
+      "schema": { "$ref": "#/entities/Username" },
+      "description": "Username mappings"
+    },
+    "/reels/{reelId}": {
+      "schema": { "$ref": "#/entities/Reel" },
+      "description": "Reels"
+    },
+    "/comments/{commentId}": {
+      "schema": { "$ref": "#/entities/Comment" },
+      "description": "Comments"
+    },
+    "/ads/{adId}": {
+      "schema": { "$ref": "#/entities/Ad" },
+      "description": "Ads"
+    },
+    "/likes/{likeId}": {
+      "schema": { "$ref": "#/entities/Like" },
+      "description": "Likes"
+    }
+  }
+}
