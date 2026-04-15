@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, increment, getDoc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Heart, MessageCircle, Share2, Bookmark, Maximize2, Code2, X, Copy, ArrowUp, ArrowDown, Send, Twitter, Facebook } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Feed({ user }: { user: any }) {
   const [reels, setReels] = useState<any[]>([]);
@@ -76,6 +77,7 @@ function ReelItem({ reel, user }: { reel: any, user: any, key?: any }) {
   const [newComment, setNewComment] = useState('');
   const [showShareModal, setShowShareModal] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const checkLike = async () => {
@@ -158,30 +160,25 @@ function ReelItem({ reel, user }: { reel: any, user: any, key?: any }) {
 
   return (
     <div className="h-full w-full snap-start relative bg-surface flex flex-col overflow-hidden border-b border-border">
-      {/* Thin Header Ad Placeholder */}
-      <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-r from-accent/20 to-pink-500/20 backdrop-blur-md z-30 flex items-center justify-center border-b border-border/50">
-        <span className="text-[10px] font-bold text-white uppercase tracking-widest opacity-70">Advertisement Space</span>
-      </div>
-
       <iframe 
         ref={iframeRef}
-        className="absolute inset-0 w-full h-full pt-10 pb-10" 
+        className="absolute inset-0 w-full h-full" 
         sandbox="allow-scripts" 
         srcDoc={codeContent}
         title="Reel Preview"
       />
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80 pointer-events-none"></div>
 
-      <button onClick={goFullscreen} className="absolute top-14 left-6 z-20 bg-panel/90 hover:bg-panel backdrop-blur-sm px-3 py-2 rounded-lg text-foreground font-medium text-xs transition flex items-center gap-2 border border-border shadow-sm">
+      <button onClick={goFullscreen} className="absolute top-6 left-6 z-20 bg-panel/90 hover:bg-panel backdrop-blur-sm px-3 py-2 rounded-lg text-foreground font-medium text-xs transition flex items-center gap-2 border border-border shadow-sm">
         <Maximize2 size={14} /> Full
       </button>
 
-      <button onClick={() => setShowCode(!showCode)} className="absolute top-14 right-6 z-20 bg-panel/90 hover:bg-panel backdrop-blur-sm px-3 py-2 rounded-lg text-foreground font-medium text-xs transition flex items-center gap-2 border border-border shadow-sm">
+      <button onClick={() => setShowCode(!showCode)} className="absolute top-6 right-6 z-20 bg-panel/90 hover:bg-panel backdrop-blur-sm px-3 py-2 rounded-lg text-foreground font-medium text-xs transition flex items-center gap-2 border border-border shadow-sm">
         <Code2 size={14} /> Code
       </button>
 
       {showCode && (
-        <div className="absolute inset-0 bg-panel/95 backdrop-blur-md overflow-auto z-40 flex flex-col p-6 pt-14 transition-all duration-300">
+        <div className="absolute inset-0 bg-panel/95 backdrop-blur-md overflow-auto z-40 flex flex-col p-6 transition-all duration-300">
           <div className="flex gap-2 mb-4 border-b border-border pb-4">
             {['html', 'css', 'js'].map(lang => (
               <button 
@@ -282,7 +279,7 @@ function ReelItem({ reel, user }: { reel: any, user: any, key?: any }) {
       )}
 
       <div className="absolute bottom-24 md:bottom-14 left-6 right-20 z-20 pointer-events-none">
-        <div className="flex items-center gap-3 mb-3 pointer-events-auto cursor-pointer w-fit" onClick={() => window.location.href = `/profile/${reel.userId}`}>
+        <div className="flex items-center gap-3 mb-3 pointer-events-auto cursor-pointer w-fit" onClick={() => navigate(`/profile/${reel.userId}`)}>
           <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center font-bold text-lg overflow-hidden flex-shrink-0 text-foreground border-2 border-white shadow-lg">
             {reel.userPhotoURL ? <img src={reel.userPhotoURL} alt="User" className="w-full h-full object-cover" /> : reel.username[0].toUpperCase()}
           </div>
@@ -319,11 +316,6 @@ function ReelItem({ reel, user }: { reel: any, user: any, key?: any }) {
           </div>
           <span className="text-xs font-bold">Share</span>
         </button>
-      </div>
-
-      {/* Thin Footer Ad Placeholder */}
-      <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-r from-pink-500/20 to-accent/20 backdrop-blur-md z-30 flex items-center justify-center border-t border-border/50">
-        <span className="text-[10px] font-bold text-white uppercase tracking-widest opacity-70">Advertisement Space</span>
       </div>
     </div>
   );

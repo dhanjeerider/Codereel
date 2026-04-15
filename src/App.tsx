@@ -67,7 +67,7 @@ export default function App() {
             <Route index element={<Feed user={user} />} />
             <Route path="explore" element={<Explore />} />
             <Route path="create" element={<Create user={user} />} />
-            <Route path="profile/:username?" element={<Profile user={user} />} />
+            <Route path="profile/:id?" element={<Profile user={user} />} />
             <Route path="settings" element={<Settings user={user} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
