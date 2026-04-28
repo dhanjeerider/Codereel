@@ -1,9 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { collection, addDoc, doc, updateDoc, increment, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Film, Type, Hash, Image as ImageIcon, Play, Rocket, X, Camera } from 'lucide-react';
 import { uploadImage } from '../lib/imgbb';
+import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
 
 export default function Create({ user }: { user: any }) {
   const navigate = useNavigate();
@@ -18,6 +19,33 @@ export default function Create({ user }: { user: any }) {
   const [loading, setLoading] = useState(false);
   const [posterURL, setPosterURL] = useState('');
   const posterInputRef = useRef<HTMLInputElement>(null);
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
+
+  React.useEffect(() => {
+    if (editId) {
+      getDoc(doc(db, 'reels', editId)).then(docSnap => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          // Only allow editing if user is owner or admin
+          if (data.userId === user.uid || user.isAdmin) {
+            setHtml(data.html || '');
+            setCss(data.css || '');
+            setJs(data.js || '');
+            setCaption(data.caption || '');
+            setTags(data.tags || []);
+            setPosterURL(data.posterURL || '');
+          } else {
+            console.error("You don't have permission to edit this reel.");
+            navigate('/');
+          }
+        }
+      }).catch(err => {
+        console.error("Error fetching reel for edit", err);
+        handleFirestoreError(err, OperationType.GET, `reels/${editId}`);
+      });
+    }
+  }, [editId, user.uid, user.isAdmin, navigate]);
 
   const handleAddTag = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -52,14 +80,14 @@ export default function Create({ user }: { user: any }) {
     if (url) {
       setPosterURL(url);
     } else {
-      alert('Failed to upload poster image');
+      console.error('Failed to upload poster image');
     }
     setLoading(false);
   };
 
   const publishReel = async () => {
     if (!html && !css && !js) {
-      alert('Add some code first!');
+      console.error('Add some code first!');
       return;
     }
     setLoading(true);
@@ -67,30 +95,41 @@ export default function Create({ user }: { user: any }) {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       const userData = userDoc.data();
       
-      await addDoc(collection(db, 'reels'), {
-        html,
-        css,
-        js,
-        caption,
-        tags,
-        userId: user.uid,
-        username: userData?.username || 'user',
-        userPhotoURL: userData?.photoURL || '',
-        thumbnail: '',
-        posterURL,
-        likes: 0,
-        comments: 0,
-        timestamp: Date.now(),
-        isVerified: userData?.isVerified || false
-      });
-      
-      await updateDoc(doc(db, 'users', user.uid), {
-        reels: increment(1)
-      });
+      if (editId) {
+        await updateDoc(doc(db, 'reels', editId), {
+          html,
+          css,
+          js,
+          caption,
+          tags,
+          posterURL
+        });
+      } else {
+        await addDoc(collection(db, 'reels'), {
+          html,
+          css,
+          js,
+          caption,
+          tags,
+          userId: user.uid,
+          username: userData?.username || 'user',
+          userPhotoURL: userData?.photoURL || '',
+          thumbnail: '',
+          posterURL,
+          likes: 0,
+          comments: 0,
+          timestamp: Date.now(),
+          isVerified: userData?.isVerified || false
+        });
+        
+        await updateDoc(doc(db, 'users', user.uid), {
+          reels: increment(1)
+        });
+      }
       
       navigate('/');
     } catch (err: any) {
-      alert('Publish failed: ' + err.message);
+      console.error('Publish failed: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -103,7 +142,7 @@ export default function Create({ user }: { user: any }) {
           <div className="w-8 h-8 bg-gradient-to-br from-accent to-pink-500 rounded-lg flex items-center justify-center text-white shadow-lg shadow-accent/20">
             <Film size={16} />
           </div>
-          <span className="text-gradient">Create New Reel</span>
+          <span className="text-gradient">{editId ? 'Edit Reel' : 'Create New Reel'}</span>
         </h2>
 
         <div className="mb-6 bg-panel/80 backdrop-blur-md p-6 rounded-2xl border border-border shadow-sm">
@@ -225,7 +264,7 @@ export default function Create({ user }: { user: any }) {
           disabled={loading}
           className="w-full py-4 rounded-xl bg-gradient-to-r from-accent to-pink-500 font-medium text-white hover:opacity-90 transition text-sm flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-accent/20"
         >
-          <Rocket size={16} /> {loading ? 'Publishing...' : 'Publish Reel'}
+          <Rocket size={16} /> {loading ? (editId ? 'Updating...' : 'Publishing...') : (editId ? 'Update Reel' : 'Publish Reel')}
         </button>
       </div>
     </div>

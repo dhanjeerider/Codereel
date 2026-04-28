@@ -5,6 +5,7 @@ import { signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { Settings as SettingsIcon, User, Shield, Bell, LogOut, Camera, Image as ImageIcon } from 'lucide-react';
 import { uploadImage } from '../lib/imgbb';
+import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
 
 export default function Settings({ user }: { user: any }) {
   const navigate = useNavigate();
@@ -23,16 +24,22 @@ export default function Settings({ user }: { user: any }) {
 
   useEffect(() => {
     const fetchUser = async () => {
-      const docSnap = await getDoc(doc(db, 'users', user.uid));
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setUserData(data);
-        setName(data.name || '');
-        setBio(data.bio || '');
-        setPhotoURL(data.photoURL || '');
-        setBannerURL(data.bannerURL || '');
+      try {
+        const docSnap = await getDoc(doc(db, 'users', user.uid));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setUserData(data);
+          setName(data.name || '');
+          setBio(data.bio || '');
+          setPhotoURL(data.photoURL || '');
+          setBannerURL(data.bannerURL || '');
+        }
+      } catch (err) {
+        console.error("Error fetching user data", err);
+        handleFirestoreError(err, OperationType.GET, `users/${user.uid}`);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     fetchUser();
   }, [user.uid]);
@@ -57,10 +64,9 @@ export default function Settings({ user }: { user: any }) {
         bannerURL
       });
       setUserData({ ...userData, name, bio, photoURL, bannerURL });
-      alert('Profile updated successfully!');
+      // Removed alert
     } catch (error) {
       console.error("Error updating profile", error);
-      alert('Failed to update profile');
     }
     setSaving(false);
   };
@@ -75,7 +81,7 @@ export default function Settings({ user }: { user: any }) {
       if (type === 'photo') setPhotoURL(url);
       if (type === 'banner') setBannerURL(url);
     } else {
-      alert('Failed to upload image');
+      console.error('Failed to upload image');
     }
     setSaving(false);
   };

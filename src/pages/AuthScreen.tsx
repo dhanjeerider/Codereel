@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { auth, db } from '../firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, updateProfile } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { Bolt, LogIn, UserPlus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
 
 export default function AuthScreen() {
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -13,34 +16,82 @@ export default function AuthScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState('');
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  // Debounce for username check
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (username.length >= 3 && username.length <= 20) {
+        performCheck(username);
+      } else if (username.length > 0) {
+        setUsernameStatus('3-20 characters required');
+      } else {
+        setUsernameStatus('');
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [username]);
 
-  const checkUsername = async (val: string) => {
-    setUsername(val);
-    if (val.length < 3) {
-      setUsernameStatus('3-20 characters required');
-      return;
+  const performCheck = async (val: string) => {
+    setCheckingUsername(true);
+    setError('');
+    try {
+      const docRef = doc(db, 'usernames', val.toLowerCase());
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setUsernameStatus('Username taken');
+      } else {
+        setUsernameStatus('Available');
+      }
+    } catch (err: any) {
+      console.error("Error checking username:", err);
+      if (err.message?.includes('offline')) {
+        setUsernameStatus('Offline (check connection)');
+        setError('Database appears to be offline. Please check your internet or try refreshing.');
+      } else {
+        setUsernameStatus('Check failed');
+        try {
+          handleFirestoreError(err, OperationType.GET, `usernames/${val}`);
+        } catch (handledErr: any) {
+          setError(`Database error: ${handledErr.message}`);
+        }
+      }
+    } finally {
+      setCheckingUsername(false);
     }
-    const docRef = doc(db, 'usernames', val.toLowerCase());
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      setUsernameStatus('Username taken');
+  };
+
+  const onUsernameChange = (val: string) => {
+    const cleaned = val.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+    setUsername(cleaned);
+    if (cleaned.length > 0) {
+      setUsernameStatus('Checking...');
     } else {
-      setUsernameStatus('Available');
+      setUsernameStatus('');
     }
   };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    
+    // Additional validation for signup
+    if (!isLogin) {
+      if (username.length < 3 || username.length > 20) {
+        setError('Username must be 3-20 characters');
+        return;
+      }
+      if (usernameStatus !== 'Available' && usernameStatus !== 'Offline (check connection)') {
+        setError('Please wait for username validation or choose another one');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
-        if (usernameStatus !== 'Available') {
-          throw new Error('Please choose a valid username');
-        }
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         
@@ -64,11 +115,13 @@ export default function AuthScreen() {
           notif_likes: true,
           notif_followers: true,
           createdAt: Date.now()
-        });
+        }).catch(err => handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`));
         
-        await setDoc(doc(db, 'usernames', username.toLowerCase()), { uid: user.uid, createdAt: Date.now() });
+        await setDoc(doc(db, 'usernames', username.toLowerCase()), { uid: user.uid, createdAt: Date.now() })
+          .catch(err => handleFirestoreError(err, OperationType.WRITE, `usernames/${username}`));
       }
     } catch (err: any) {
+      console.error("Auth error:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -133,11 +186,12 @@ export default function AuthScreen() {
                     type="text" 
                     placeholder="Username (3-20 chars)" 
                     value={username}
-                    onChange={(e) => checkUsername(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg bg-panel border border-border focus:border-accent focus:outline-none transition text-foreground placeholder-muted text-sm"
+                    onChange={(e) => onUsernameChange(e.target.value)}
+                    className="w-full px-4 py-3 rounded-lg bg-panel border-border focus:border-accent focus:outline-none transition text-foreground placeholder-muted text-sm shadow-inner"
                     required
                   />
-                  <div className={`text-sm mt-2 h-5 ${usernameStatus === 'Available' ? 'text-green-600' : 'text-red-500'}`}>
+                  <div className={`text-sm mt-2 h-5 flex items-center gap-2 ${usernameStatus === 'Available' ? 'text-green-500' : 'text-red-500'}`}>
+                    {checkingUsername && <div className="w-3 h-3 border-2 border-accent border-t-transparent rounded-full animate-spin"></div>}
                     {usernameStatus}
                   </div>
                 </div>
@@ -179,6 +233,14 @@ export default function AuthScreen() {
             className="w-full py-3 rounded-lg border border-border font-medium hover:bg-surface transition flex items-center justify-center gap-2 text-sm"
           >
             Google
+          </button>
+
+          <button 
+            onClick={() => navigate('/')}
+            disabled={loading}
+            className="w-full mt-2 py-3 rounded-lg border border-transparent font-medium text-muted hover:text-foreground transition text-sm underline underline-offset-4"
+          >
+            Skip for now, just browse
           </button>
 
           {error && <div className="text-red-500 text-sm mt-4 text-center">{error}</div>}

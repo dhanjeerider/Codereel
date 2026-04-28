@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { doc, getDoc, collection, query, where, getDocs, setDoc, deleteDoc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, Edit, Share2, Video, UserPlus, UserMinus, Twitter, Facebook, MessageCircle, Copy, X } from 'lucide-react';
+import { CheckCircle, Edit, Share2, Video, UserPlus, UserMinus, Twitter, Facebook, MessageCircle, Copy, X, ShieldAlert } from 'lucide-react';
+import ConfirmModal from '../components/ConfirmModal';
+import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
 
 export default function Profile({ user }: { user: any }) {
   const { id } = useParams();
@@ -14,14 +16,20 @@ export default function Profile({ user }: { user: any }) {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [confirmBan, setConfirmBan] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
       setLoading(true);
       try {
-        let targetUid = id || user.uid;
+        const targetUid = id || user?.uid;
+        if (!targetUid) {
+          setProfileUser(null);
+          setLoading(false);
+          return;
+        }
         
-        setIsOwnProfile(targetUid === user.uid);
+        setIsOwnProfile(user ? targetUid === user.uid : false);
         
         const userDoc = await getDoc(doc(db, 'users', targetUid));
         if (userDoc.exists()) {
@@ -34,12 +42,16 @@ export default function Profile({ user }: { user: any }) {
         const reelsSnap = await getDocs(q);
         setUserReels(reelsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         
-        if (targetUid !== user.uid) {
-          const followDoc = await getDoc(doc(db, 'follows', `${user.uid}_${targetUid}`));
+        if (user && targetUid !== user.uid) {
+          const followDoc = await getDoc(doc(db, 'follows', `${user.uid}_${targetUid}`))
+            .catch(err => {
+              if (err.message?.includes('offline')) throw err;
+              return handleFirestoreError(err, OperationType.GET, `follows/${user.uid}_${targetUid}`);
+            });
           setIsFollowing(followDoc.exists());
         }
-      } catch (err) {
-        console.error(err);
+      } catch (err: any) {
+        console.error("Profile fetch error:", err);
       } finally {
         setLoading(false);
       }
@@ -49,6 +61,10 @@ export default function Profile({ user }: { user: any }) {
   }, [id, user.uid]);
 
   const handleFollow = async () => {
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
     if (!profileUser || isOwnProfile || followLoading) return;
     setFollowLoading(true);
     
@@ -61,19 +77,29 @@ export default function Profile({ user }: { user: any }) {
         await deleteDoc(followRef);
         await updateDoc(targetUserRef, { followers: increment(-1) });
         await updateDoc(currentUserRef, { following: increment(-1) });
-        setProfileUser(prev => ({ ...prev, followers: Math.max(0, (prev.followers || 0) - 1) }));
+        setProfileUser((prev: any) => ({ ...prev, followers: Math.max(0, (prev.followers || 0) - 1) }));
         setIsFollowing(false);
       } else {
         await setDoc(followRef, { followerId: user.uid, followingId: profileUser.id, timestamp: Date.now() });
         await updateDoc(targetUserRef, { followers: increment(1) });
         await updateDoc(currentUserRef, { following: increment(1) });
-        setProfileUser(prev => ({ ...prev, followers: (prev.followers || 0) + 1 }));
+        setProfileUser((prev: any) => ({ ...prev, followers: (prev.followers || 0) + 1 }));
         setIsFollowing(true);
       }
     } catch (error) {
       console.error("Error updating follow status", error);
     }
     setFollowLoading(false);
+  };
+
+  const handleBanUser = async () => {
+    if (!user || !user.isAdmin || isOwnProfile) return;
+    try {
+      await updateDoc(doc(db, 'users', profileUser.id), { isBanned: !profileUser.isBanned });
+      setProfileUser((prev: any) => ({ ...prev, isBanned: !prev.isBanned }));
+    } catch (err) {
+      console.error("Error updating ban status", err);
+    }
   };
 
   if (loading) {
@@ -154,6 +180,12 @@ export default function Profile({ user }: { user: any }) {
           <button onClick={() => setShowShareModal(true)} className="px-5 py-2.5 rounded-xl bg-surface border border-border text-foreground text-sm font-medium hover:bg-border/50 transition flex items-center gap-2 shadow-sm">
             <Share2 size={16} /> Share
           </button>
+          
+          {user?.isAdmin && !isOwnProfile && (
+            <button onClick={() => setConfirmBan(true)} className={`px-5 py-2.5 rounded-xl border text-sm font-medium transition flex items-center gap-2 shadow-sm ${profileUser.isBanned ? 'bg-green-500/10 border-green-500/50 text-green-500 hover:bg-green-500/20' : 'bg-red-500/10 border-red-500/50 text-red-500 hover:bg-red-500/20'}`}>
+              <ShieldAlert size={16} /> {profileUser.isBanned ? 'Unban User' : 'Ban User'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -203,7 +235,7 @@ export default function Profile({ user }: { user: any }) {
               </button>
             </div>
             <div className="flex flex-col gap-3">
-              <button onClick={() => { navigator.clipboard.writeText(window.location.origin + '/profile/' + profileUser.id); alert('Link copied!'); setShowShareModal(false); }} className="flex items-center gap-4 p-3 rounded-xl bg-surface hover:bg-border/50 transition border border-border/50 shadow-sm">
+              <button onClick={() => { navigator.clipboard.writeText(window.location.origin + '/profile/' + profileUser.id); setShowShareModal(false); }} className="flex items-center gap-4 p-3 rounded-xl bg-surface hover:bg-border/50 transition border border-border/50 shadow-sm">
                 <div className="w-10 h-10 rounded-full bg-panel flex items-center justify-center shadow-sm text-foreground"><Copy size={18} /></div>
                 <span className="font-bold text-foreground">Copy Direct Link</span>
               </button>
@@ -223,6 +255,14 @@ export default function Profile({ user }: { user: any }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal 
+        isOpen={confirmBan}
+        title={profileUser?.isBanned ? 'Unban User' : 'Ban User'}
+        message={profileUser?.isBanned ? 'Are you sure you want to unban this user? They will regain access to the application.' : 'Are you sure you want to ban this user? They will lose access to the application.'}
+        onConfirm={handleBanUser}
+        onCancel={() => setConfirmBan(false)}
+      />
     </div>
   );
 }

@@ -1,60 +1,92 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAuthenticated() {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
       return request.auth != null;
     }
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
     function isAdmin() {
-      return isAuthenticated() && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
+      return isSignedIn() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isAdmin', false) == true) ||
         (request.auth.token.email == "dhanjeekumar775145@gmail.com" && request.auth.token.email_verified == true)
       );
     }
 
+    function isNotBanned() {
+      return !exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isBanned', false) != true;
+    }
+
+    // --- Entity Rules ---
+
     match /users/{userId} {
       allow read: if true;
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isNotBanned();
+      allow update: if (isOwner(userId) || isAdmin()) && isNotBanned();
       allow delete: if isAdmin();
     }
 
     match /usernames/{username} {
       allow read: if true;
-      allow create: if isAuthenticated();
-      allow delete: if isOwner(resource.data.uid) || isAdmin();
+      allow create: if isSignedIn() && isNotBanned();
+      allow delete: if isAdmin() || (exists(/databases/$(database)/documents/usernames/$(username)) && get(/databases/$(database)/documents/usernames/$(username)).data.uid == request.auth.uid);
     }
 
     match /reels/{reelId} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated();
-      allow delete: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isSignedIn() && isNotBanned() && incoming().userId == request.auth.uid;
+      allow update: if isSignedIn() && isNotBanned() && (isOwner(existing().userId) || isAdmin());
+      allow delete: if (isSignedIn() && exists(/databases/$(database)/documents/reels/$(reelId)) && (get(/databases/$(database)/documents/reels/$(reelId)).data.userId == request.auth.uid)) || isAdmin();
     }
 
     match /comments/{commentId} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow delete: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isSignedIn() && isNotBanned() && incoming().userId == request.auth.uid;
+      allow delete: if (isSignedIn() && exists(/databases/$(database)/documents/comments/$(commentId)) && (get(/databases/$(database)/documents/comments/$(commentId)).data.userId == request.auth.uid)) || isAdmin();
+    }
+
+    match /likes/{likeId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isNotBanned() && incoming().userId == request.auth.uid;
+      allow delete: if (isSignedIn() && exists(/databases/$(database)/documents/likes/$(likeId)) && (get(/databases/$(database)/documents/likes/$(likeId)).data.userId == request.auth.uid)) || isAdmin();
+    }
+
+    match /follows/{followId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isNotBanned() && incoming().followerId == request.auth.uid;
+      allow delete: if (exists(/databases/$(database)/documents/follows/$(followId)) && get(/databases/$(database)/documents/follows/$(followId)).data.followerId == request.auth.uid) || isAdmin();
+    }
+
+    match /admin/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     match /ads/{adId} {
       allow read: if true;
       allow write: if isAdmin();
-    }
-
-    match /likes/{likeId} {
-      allow read: if true;
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow delete: if isOwner(resource.data.userId) || isAdmin();
-    }
-
-    match /follows/{followId} {
-      allow read: if true;
-      allow create: if isAuthenticated() && request.resource.data.followerId == request.auth.uid;
-      allow delete: if isAuthenticated() && resource.data.followerId == request.auth.uid;
     }
   }
 }

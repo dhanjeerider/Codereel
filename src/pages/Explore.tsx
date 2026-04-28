@@ -13,25 +13,30 @@ export default function Explore() {
 
   useEffect(() => {
     const fetchExplore = async () => {
-      const q = query(collection(db, 'reels'), orderBy('timestamp', 'desc'), limit(40));
-      const snapshot = await getDocs(q);
-      const reelsData: any[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setReels(reelsData);
-      
-      const tagsCount: Record<string, number> = {};
-      reelsData.forEach(r => {
-        (r.tags || []).forEach((t: string) => {
-          tagsCount[t] = (tagsCount[t] || 0) + 1;
-        });
-      });
-      
-      const sortedTags = Object.entries(tagsCount)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 12)
-        .map(([t]) => t);
+      try {
+        const q = query(collection(db, 'reels'), orderBy('timestamp', 'desc'), limit(40));
+        const snapshot = await getDocs(q);
+        const reelsData: any[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setReels(reelsData);
         
-      setTrendingTags(sortedTags);
-      setLoading(false);
+        const tagsCount: Record<string, number> = {};
+        reelsData.forEach(r => {
+          (r.tags || []).forEach((t: string) => {
+            tagsCount[t] = (tagsCount[t] || 0) + 1;
+          });
+        });
+        
+        const sortedTags = Object.entries(tagsCount)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 12)
+          .map(([t]) => t);
+          
+        setTrendingTags(sortedTags);
+      } catch (err) {
+        console.error("Explore fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchExplore();
   }, []);
