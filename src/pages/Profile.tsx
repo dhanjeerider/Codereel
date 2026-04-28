@@ -199,24 +199,41 @@ export default function Profile({ user }: { user: any }) {
             No reels yet
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {userReels.map(reel => (
               <div 
                 key={reel.id}
-                onClick={() => navigate('/')}
-                className="bg-surface rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-accent transition group relative aspect-[9/16] border border-border shadow-sm"
+                onClick={() => navigate(`/?reel=${reel.id}`)}
+                className="bg-surface rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-accent transition group relative aspect-[9/16] border border-border shadow-md"
               >
                 {reel.posterURL ? (
                   <img src={reel.posterURL} alt="Poster" className="w-full h-full object-cover" />
                 ) : (
-                  <iframe 
-                    className="w-full h-full scale-150 group-hover:scale-[1.6] transition pointer-events-none" 
-                    sandbox="allow-scripts" 
-                    srcDoc={`<html><head><style>${reel.css || ''}</style></head><body style="margin:0">${reel.html || ''}</body></html>`}
-                    title="reel thumbnail"
-                  />
+                  <div className="reel-thumbnail-container">
+                    <iframe 
+                      className="reel-thumbnail-iframe" 
+                      sandbox="allow-scripts" 
+                      srcDoc={`<html><head><style>${reel.css || ''}</style></head><body style="margin:0">${reel.html || ''}</body></html>`}
+                      title="reel thumbnail"
+                    />
+                  </div>
                 )}
-                <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-100 transition z-10"></div>
+                
+                <div className="absolute bottom-0 left-0 right-0 p-3 flex justify-end z-20">
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const url = `${window.location.origin}/?reel=${reel.id}`;
+                      navigator.clipboard.writeText(url);
+                      alert("Reel link copied to clipboard!");
+                    }}
+                    className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-accent transition-colors shadow-lg border border-white/10"
+                    title="Share Reel"
+                  >
+                    <Share2 size={14} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>

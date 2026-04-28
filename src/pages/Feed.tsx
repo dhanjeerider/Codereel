@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, increment, getDoc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
+import { useSearchParams } from 'react-router-dom';
+import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, increment, getDoc, setDoc, deleteDoc, addDoc, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Heart, MessageCircle, Share2, Bookmark, Maximize2, Code2, X, Copy, ArrowUp, ArrowDown, Send, Twitter, Facebook, MoreVertical, Trash2, Edit } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -10,9 +11,50 @@ export default function Feed({ user }: { user: any }) {
   const [reels, setReels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [searchParams] = useSearchParams();
+  const reelIdFromUrl = searchParams.get('reel');
 
   useEffect(() => {
-    const q = query(collection(db, 'reels'), orderBy('timestamp', 'desc'), limit(30));
+    let q;
+    if (reelIdFromUrl) {
+      // If a specific reel is requested, we fetch it first or prioritize it
+      const fetchRequestedReel = async () => {
+        try {
+          const reelDoc = await getDoc(doc(db, 'reels', reelIdFromUrl));
+          if (reelDoc.exists()) {
+            const requestedReel = { id: reelDoc.id, ...reelDoc.data() };
+            // Then fetch others
+            const othersQuery = query(
+              collection(db, 'reels'), 
+              orderBy('timestamp', 'desc'), 
+              limit(30)
+            );
+            const othersSnap = await getDocs(othersQuery);
+            const othersData = othersSnap.docs
+              .map(d => ({ id: d.id, ...d.data() }))
+              .filter(d => d.id !== reelIdFromUrl);
+              
+            setReels([requestedReel, ...othersData]);
+          } else {
+            // Fallback if requested reel doesn't exist
+            const fallbackQuery = query(collection(db, 'reels'), orderBy('timestamp', 'desc'), limit(30));
+            const fallbackSnap = await getDocs(fallbackQuery);
+            setReels(fallbackSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+          }
+        } catch (error) {
+          console.error("Error fetching specific reel:", error);
+          const fallbackQuery = query(collection(db, 'reels'), orderBy('timestamp', 'desc'), limit(30));
+          const fallbackSnap = await getDocs(fallbackQuery);
+          setReels(fallbackSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchRequestedReel();
+      return;
+    }
+
+    q = query(collection(db, 'reels'), orderBy('timestamp', 'desc'), limit(30));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const reelsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setReels(reelsData);
@@ -23,7 +65,7 @@ export default function Feed({ user }: { user: any }) {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [reelIdFromUrl]);
 
   const scrollReels = (direction: number) => {
     if (containerRef.current) {
@@ -259,7 +301,7 @@ function ReelItem({ reel, user }: { reel: any, user: any, key?: any }) {
       )}
 
       {showComments && (
-        <div className="absolute inset-x-0 bottom-10 top-1/3 bg-panel/95 backdrop-blur-xl rounded-t-3xl z-40 flex flex-col p-6 transition-all duration-300 border-t border-border shadow-2xl">
+        <div className="absolute inset-x-0 bottom-16 top-1/3 bg-panel/95 backdrop-blur-xl rounded-t-3xl z-[60] flex flex-col p-6 transition-all duration-300 border-t border-border shadow-2xl">
           <div className="flex justify-between items-center mb-4 pb-4 border-b border-border">
             <h3 className="font-bold text-lg flex items-center gap-2">
               <MessageCircle size={18} className="text-accent" /> Comments
@@ -312,7 +354,7 @@ function ReelItem({ reel, user }: { reel: any, user: any, key?: any }) {
       )}
 
       {showShareModal && (
-        <div className="absolute inset-x-0 bottom-10 top-1/3 bg-panel/95 backdrop-blur-xl rounded-t-3xl z-50 flex flex-col p-6 transition-all duration-300 border-t border-border shadow-2xl">
+        <div className="absolute inset-x-0 bottom-16 top-1/3 bg-panel/95 backdrop-blur-xl rounded-t-3xl z-[60] flex flex-col p-6 transition-all duration-300 border-t border-border shadow-2xl">
           <div className="flex justify-between items-center mb-6 pb-4 border-b border-border">
             <h3 className="font-bold text-lg flex items-center gap-2 text-foreground">
               <Share2 size={18} className="text-accent" /> Share Reel
@@ -342,7 +384,7 @@ function ReelItem({ reel, user }: { reel: any, user: any, key?: any }) {
         </div>
       )}
 
-      <div className="absolute bottom-16 md:bottom-10 left-4 right-16 z-20 pointer-events-none">
+      <div className="absolute bottom-32 md:bottom-10 left-4 right-16 z-30 pointer-events-none">
         <div className="flex items-center gap-3 mb-2 pointer-events-auto cursor-pointer w-fit" onClick={() => navigate(`/profile/${reel.userId}`)}>
           <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center font-bold text-base overflow-hidden flex-shrink-0 text-foreground border-2 border-white shadow-lg">
             {reel.userPhotoURL ? <img src={reel.userPhotoURL} alt="User" className="w-full h-full object-cover" /> : reel.username[0].toUpperCase()}
@@ -361,7 +403,7 @@ function ReelItem({ reel, user }: { reel: any, user: any, key?: any }) {
         </div>
       </div>
 
-      <div className="absolute bottom-16 md:bottom-10 right-4 z-20 flex flex-col gap-5 items-center">
+      <div className="absolute bottom-32 md:bottom-10 right-4 z-30 flex flex-col gap-5 items-center">
         <button onClick={handleLike} className="flex flex-col items-center gap-1 text-white drop-shadow-md hover:scale-110 transition group">
           <div className={`p-2.5 rounded-full backdrop-blur-md shadow-lg transition-colors ${isLiked ? 'bg-white text-red-500' : 'bg-black/40 text-white group-hover:bg-black/60 border border-white/10'}`}>
             <Heart size={20} className={isLiked ? "fill-red-500" : ""} />
